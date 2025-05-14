@@ -33,3 +33,82 @@ Thread t = new Thread(
         }
 );
 ```
+
+## 3.1.3 Состояние нити
+Нити имеют следующие состояния:
+- NEW: Поток создан, но ещё не запущен. Возникает сразу после создания объекта Thread, но до вызова метода start(). В этом состоянии поток не готов к выполнению и не потребляет системные ресурсы. <br>
+Пример:
+```java
+Thread thread = new Thread(() -> System.out.println("Hello!"));
+System.out.println(thread.getState()); // NEW
+```
+
+- RUNNABLE: поток запущен, но не обязательно выполняется в данный момент. Включает в себя два подсостояния: Ready (ждёт CPU от планировщика) и Running (выполняется на CPU). <br>
+Пример:
+```java
+thread.start();
+System.out.println(thread.getState()); // RUNNABLE
+```
+- BLOCKED: Поток переходит в это состояние, если он пытается войти в синхронизированный блок или метод, доступ к которому в данный момент удерживается другим потоком. Как только монитор освобождается, поток возвращается в состояние RUNNABLE. <br>
+Пример:
+```java
+Object lock = new Object();
+
+Thread thread1 = new Thread(() -> {
+    synchronized (lock) {
+        while (true); // Бесконечный цикл (удерживает lock)
+    }
+});
+
+Thread thread2 = new Thread(() -> {
+    synchronized (lock) { // Блокируется, пока thread1 не отпустит lock
+        System.out.println("Захватил lock!");
+    }
+});
+
+thread1.start();
+thread2.start();
+Thread.sleep(100);
+System.out.println(thread2.getState()); // BLOCKED
+```
+
+- WAITING: Поток находится в состоянии ожидания без указания времени, пока другой поток не разбудит его. Это происходит при вызове методов Object.wait(), Thread.join() без таймаута или LockSupport.park(). Поток остаётся в этом состоянии, пока не получит уведомление или пока другой поток не завершится (в случае join()). <br>
+Пример:
+```java
+Thread thread1 = new Thread(() -> {
+    synchronized (lock) {
+        try {
+            lock.wait(); // Переходит в WAITING
+        } catch (InterruptedException e) {}
+    }
+});
+
+thread1.start();
+Thread.sleep(100);
+System.out.println(thread1.getState()); // WAITING
+```
+
+- TIMED_WAITING: Похожее на состояние WAITING, но с указанным временем ожидания. Поток переходит в это состояние при вызове методов sleep(), wait() или join() с указанием таймаута. По истечении времени ожидания поток автоматически возвращается в состояние RUNNABLE.<br>
+Пример:
+```java
+Thread thread = new Thread(() -> {
+    try {
+        Thread.sleep(1000); // TIMED_WAITING
+    } catch (InterruptedException e) {}
+});
+
+thread.start();
+Thread.sleep(100);
+System.out.println(thread.getState()); // TIMED_WAITING
+```
+
+- TERMINATED: Поток переходит в это состояние, когда метод run() завершает своё выполнение либо из-за нормального завершения, либо из-за неперехваченного исключения. В этом состоянии поток больше не может быть перезапущен.<br>
+Пример:
+```java
+Thread thread = new Thread(() -> System.out.println("Done!"));
+thread.start();
+thread.join(); // Ждем завершения
+System.out.println(thread.getState()); // TERMINATED
+```
+
+![img.png](img/thread-lifecycle.png)
