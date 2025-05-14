@@ -1,6 +1,7 @@
 package ru.job4j.sync.tasks.visibility;
 
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -17,7 +18,7 @@ public class FileParser {
 
     public String getContent(Predicate<Integer> predicate) throws IOException {
         StringBuilder output = new StringBuilder();
-        try (InputStream input = new FileInputStream(file)) {
+        try (InputStream input = new BufferedInputStream(new FileInputStream(file))) {
             int data;
             while ((data = input.read()) > 0) {
                 if (predicate.test(data)) {
