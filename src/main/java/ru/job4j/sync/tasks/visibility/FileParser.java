@@ -20,7 +20,7 @@ public class FileParser {
         StringBuilder output = new StringBuilder();
         try (InputStream input = new BufferedInputStream(new FileInputStream(file))) {
             int data;
-            while ((data = input.read()) > 0) {
+            while ((data = input.read()) != -1) {
                 if (predicate.test(data)) {
                     output.append((char) data);
                 }
