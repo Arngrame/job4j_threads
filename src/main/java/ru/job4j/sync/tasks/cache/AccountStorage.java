@@ -12,13 +12,7 @@ public class AccountStorage {
     }
 
     public synchronized boolean update(Account account) {
-        Account updated = accounts.getOrDefault(account.id(), null);
-        if (updated != null) {
-            accounts.put(account.id(), new Account(account.id(), account.amount()));
-            return true;
-        }
-
-        return false;
+        return accounts.replace(account.id(), account) != null;
     }
 
     public synchronized void delete(int id) {
@@ -26,31 +20,21 @@ public class AccountStorage {
     }
 
     public synchronized Optional<Account> getById(int id) {
-        if (accounts.containsKey(id)) {
-            return Optional.of(accounts.get(id));
-        }
-
-        return Optional.empty();
+        return Optional.ofNullable(accounts.get(id));
     }
 
     public synchronized boolean transfer(int fromId, int toId, int amount) {
-        Optional<Account> from = getById(fromId);
-        Optional<Account> to = getById(toId);
+        Account from = getById(fromId)
+                .orElseThrow(() -> new IllegalStateException("Not found source account"));
+        Account to = getById(toId)
+                .orElseThrow(() -> new IllegalStateException("Not found destination account"));
 
-        if (from.isEmpty()) {
-            throw new IllegalStateException("Not found source account");
-        }
-
-        if (to.isEmpty()) {
-            throw new IllegalStateException("Not found destination account");
-        }
-
-        if (from.get().amount() < amount) {
+        if (from.amount() < amount) {
             throw new IllegalStateException("Not enough money to proceed the transfer request");
         }
 
-        Account newFrom = new Account(from.get().id(), from.get().amount() - amount);
-        Account newTo = new Account(to.get().id(), to.get().amount() + amount);
+        Account newFrom = new Account(from.id(), from.amount() - amount);
+        Account newTo = new Account(to.id(), to.amount() + amount);
 
         return update(newFrom) && update(newTo);
     }
