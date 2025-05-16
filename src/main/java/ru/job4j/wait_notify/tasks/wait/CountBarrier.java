@@ -1,4 +1,4 @@
-package ru.job4j.sync.tasks.wait_notify;
+package ru.job4j.wait_notify.tasks.wait;
 
 public class CountBarrier {
 

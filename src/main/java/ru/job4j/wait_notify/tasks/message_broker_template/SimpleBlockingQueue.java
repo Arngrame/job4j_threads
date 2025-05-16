@@ -1,4 +1,4 @@
-package ru.job4j.sync.tasks.message_broker_template;
+package ru.job4j.wait_notify.tasks.message_broker_template;
 
 import net.jcip.annotations.GuardedBy;
 import net.jcip.annotations.ThreadSafe;

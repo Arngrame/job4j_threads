@@ -1,6 +1,7 @@
-package ru.job4j.sync.tasks.message_broker_template;
+package ru.job4j.wait_notify.tasks.message_broker_template;
 
 import org.junit.jupiter.api.Test;
+import ru.job4j.wait_notify.tasks.message_broker_template.SimpleBlockingQueue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
