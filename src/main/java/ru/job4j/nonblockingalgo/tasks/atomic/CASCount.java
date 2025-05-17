@@ -1,4 +1,4 @@
-package ru.job4j.nonblockingalgo.tasks;
+package ru.job4j.nonblockingalgo.tasks.atomic;
 
 import net.jcip.annotations.ThreadSafe;
 
