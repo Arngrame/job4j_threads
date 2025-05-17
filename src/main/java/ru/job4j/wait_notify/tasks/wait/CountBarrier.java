@@ -14,11 +14,8 @@ public class CountBarrier {
         synchronized (monitor) {
             count++;
             System.out.println(Thread.currentThread().getName() + " увеличил счётчик, текущее значение = " + count);
-
-            if (count >= total) {
-                System.out.println("Выполняется пробуждение остальных потоков...");
-                notifyAll();
-            }
+            System.out.println("Пробуждаем остальные потоки");
+            notifyAll();
         }
     }
 
