@@ -24,22 +24,18 @@ public class SimpleBlockingQueue<T> {
 
     public synchronized void offer(T value) throws InterruptedException {
         while (queue.size() >= limit) {
-            System.out.println("Очередь переполнена... жду пока сообщения считают потребители");
             wait();
         }
 
         queue.offer(value);
-        System.out.println("Сообщение опубликовано. Текущий размер очереди = " + queue.size());
         notify();
     }
 
     public synchronized T poll() throws InterruptedException {
         while (queue.isEmpty()) {
-            System.out.println("Очередь пустая... жду сообщений от производителей");
             wait();
         }
         T element = queue.poll();
-        System.out.println("Прочитал сообщение. Текущий размер очереди = " + queue.size());
         notify();
         return element;
     }
