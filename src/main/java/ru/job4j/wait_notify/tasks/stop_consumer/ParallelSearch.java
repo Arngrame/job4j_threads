@@ -26,15 +26,13 @@ public class ParallelSearch {
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-            } finally {
-                consumer.interrupt();
             }
         });
 
         consumer.start();
         producer.start();
 
-        consumer.join();
         producer.join();
+        consumer.interrupt();
     }
 }
