@@ -542,3 +542,722 @@ Exchanger здесь - место, где происходит обмен.
 - wait, notify, notifyAll обязаны быть вызванными в блоке/методе synchronized, иначе будет выброшено IllegalMonitorStateException;
 - notify без wait бесполезен, поток не ждёт
 
+#### Блокировки
+Блокировка (Lock) - это инструмент для регулирования доступа к ресурсу, с которым работает несколько потоков.
+Принцип работы с общим ресурсом:
+- поток пытается получить блокировку для ресурса
+- если ресурс свободен, поток занимает его
+- если ресурс занят, то поток ждёт пока блокировка будет снята
+
+Ключевым преимуществом synchronized является предотвращение состояния гонки и повреждение данных, а также гарантия видимости
+последнего зафиксированного значения общего ресурса, используемого несколькими потоками.
+
+Недостатки synchronized:
+- нет возможности узнать заблокирован объект или нет: поток либо получается блокировку, если она доступна, либо ждёт в очереди пока блокировка не освободится;
+- если поток встал в ожидание блокировки, то его нельзя прервать;
+- блокировка отпускается по завершению блока кода, контролируемого монитором.
+
+Далее рассмотрим инструменты пакета java.util.concurrent.locks, расширяющие возможности synchronized
+### 1. Lock
+Интерфейс, представляющий более гибкие механизмы блокировки, чем synchronized. Он явно захватывает и освобождает блокировку.
+Особенно полезны lock'и в тех случаях, где нужен захват сразу нескольких блокировок и отпускать их в нужном порядке.
+
+Особенности:
+- ресурс для блокировки должен быть обёрнут блоком try-with-resources: при возникновении исключений в этом участке кода 
+освобождение блокировки будет выполнено в блоке finally;
+- метод lock() - получает блокировку;
+- метод lockInterruptibly() - попытка получить блокировку, но если не удаётся - поток переходит в ожидание, которое может 
+быть прервано методом #interrupt;
+- new Condition()- получает объект типа Condition, связанный с этой блокировкой;
+- метод tryLock() - получение блокировки, если она доступна на момент вызова;
+- метод tryLock(long time, TimeUnit unit) - попытка получить блокировку в течение указанного времени;
+- unlock() - освобождение блокировки
+
+Примеры из жизни: 
+- Дверь в комнату. С **synchronized** это автоматическая дверь, которая закрывается при входе
+и открывается при выходе. При наличии Lock - это как иметь ключ от этой двери и самому решать когда её открывать/закрывать.
+
+Пример в коде:
+```java
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class ATMMachine {
+    private final Lock lock = new ReentrantLock();
+    private double balance;
+
+    public void withdraw(String user, double amount) {
+        lock.lock();
+        try {
+            System.out.println(user + " получает доступ к банкомату");
+            if (balance >= amount) {
+                Thread.sleep(1000); // Имитация обработки
+                balance -= amount;
+                System.out.println(user + " снял " + amount + ". Остаток: " + balance);
+            } else {
+                System.out.println(user + ": недостаточно средств");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            lock.unlock();
+            System.out.println(user + " освобождает банкомат");
+        }
+    }
+}
+```
+
+### 2. Condition
+С помощью этого инструмента можно применить условие к блокировке, т.е. позволяет управлять блокировкой.
+Методы:
+- await() - ожидание выполнения условия и пока из другого потока не будет вызван signal() / signalAll();
+- signal() - команда продолжить выполнение потоку, который ранее ожидал по await();
+- signalAll() - команда продолжить работу всем потокам, которые ранее ожидали по await().
+
+Жизненный пример: 
+- Очередь в аптеке с разными окнами - одно для рецептурных препаратов, другое для безрецептурных. 
+Фармацевт может сказать "кто ждет витамины - подойдите к окну 2".
+
+Пример в коде:
+```java
+import java.util.concurrent.locks.*;
+
+public class Pharmacy {
+    private final Lock lock = new ReentrantLock();
+    private final Condition prescriptionReady = lock.newCondition();
+    private final Condition otcReady = lock.newCondition();
+    private boolean prescriptionAvailable = false;
+    private boolean otcAvailable = false;
+
+    public void waitForPrescription(String patient) throws InterruptedException {
+        lock.lock();
+        try {
+            while (!prescriptionAvailable) {
+                System.out.println(patient + " ждет рецептурный препарат");
+                prescriptionReady.await();
+            }
+            System.out.println(patient + " получает рецептурный препарат");
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void waitForOTC(String patient) throws InterruptedException {
+        lock.lock();
+        try {
+            while (!otcAvailable) {
+                System.out.println(patient + " ждет безрецептурный препарат");
+                otcReady.await();
+            }
+            System.out.println(patient + " получает безрецептурный препарат");
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void deliverPrescription() {
+        lock.lock();
+        try {
+            prescriptionAvailable = true;
+            prescriptionReady.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void deliverOTC() {
+        lock.lock();
+        try {
+            otcAvailable = true;
+            otcReady.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+```
+
+### 3. ReentrantLock
+Реализация интерфейса Lock со схожим поведением на synchronized, но расширяющая его функционал (можно узнать в каком
+состоянии блокировка находится или ожидать блокировки в течение какого-то времени).
+ReentrantLock поддерживает возможность контроля правильной очередности захвата/отпускания блокировок (fairness).
+
+**Жизненный пример**: Кабинет врача с электронной очередью, где можно:
+- Проверить, свободен ли врач (tryLock)
+- Войти повторно, если нужно взять забытые вещи (reentrant)
+- Установить справедливую очередь (fair lock)
+
+Код:
+```java
+import java.util.concurrent.locks.ReentrantLock;
+
+public class DoctorOffice {
+  private final ReentrantLock lock = new ReentrantLock(true); // Честная очередь
+
+  public void enter(String patient) {
+    // Пытаемся войти без долгого ожидания
+    if (lock.tryLock()) {
+      try {
+        System.out.println(patient + " заходит в кабинет");
+        examinePatient(patient);
+      } finally {
+        lock.unlock();
+      }
+    } else {
+      System.out.println(patient + ": кабинет занят, ждем...");
+      lock.lock();
+      try {
+        examinePatient(patient);
+      } finally {
+        lock.unlock();
+      }
+    }
+  }
+
+  private void examinePatient(String patient) {
+    System.out.println("Доктор осматривает " + patient);
+    // Вложенный вызов с повторным захватом блокировки
+    takeTests(patient);
+  }
+
+  private void takeTests(String patient) {
+    lock.lock();
+    try {
+      System.out.println("Берем анализы у " + patient);
+    } finally {
+      lock.unlock();
+    }
+  }
+}
+```
+
+
+### 4. ReadWriteLock
+Интерфейс расширяющий Lock. Улучшает производительность в многопоточной среде с помощью связанных блокировок чтения и записи. 
+Блокировку чтения могут удерживать несколько "читателей", но только до тех пор, пока не появится "писатель". 
+Блокировка записи является эксклюзивной - если один поток взял блокировку записи, другие не могут брать ни блокировку чтения, 
+ни блокировку записи.
+
+Одновременно может быть только одна из следующих ситуаций:
+- Читатели и писатели отсутствуют.
+- Один и более читателей и ноль писателей.
+- Ровно один писатель и ноль читателей.
+
+Эта блокировка применяется при частых операциях чтения и редких операций записи у общего ресурса. 
+Обычно при наличии в очереди читателей и писателей приоритет отдаётся писателям, так эти операции ожидаемо редки, 
+а впоследствии даётся доступ сразу группе читателей. Способ выдачи блокировок потоку может быть изменён, например, 
+с помощью установки "честного" доступа - когда любую из блокировок получает нить, которая дольше всех находится в очереди.
+
+К выбору типа блокировки программы при работе с общими ресурсами нужно подходить осознанно, т.к. накладные расходы на большое количество писателей
+может привести к снижению скорости работы программы, чем при стандартной взаимоисключающей блокировке (synchronized).
+
+**Жизненный пример**: Доска объявлений в университете:
+- Многие студенты могут одновременно читать (read lock)
+- Когда администратор обновляет объявления, все ждут (write lock)
+
+Код:
+```java
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+public class BulletinBoard {
+    private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+    private String announcement;
+
+    public String readAnnouncement(String student) {
+        rwLock.readLock().lock();
+        try {
+            System.out.println(student + " читает объявление: " + announcement);
+            return announcement;
+        } finally {
+            rwLock.readLock().unlock();
+        }
+    }
+
+    public void updateAnnouncement(String admin, String newAnnouncement) {
+        rwLock.writeLock().lock();
+        try {
+            System.out.println(admin + " обновляет объявление...");
+            Thread.sleep(2000); // Имитация длительного обновления
+            announcement = newAnnouncement;
+            System.out.println("Объявление обновлено: " + newAnnouncement);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            rwLock.writeLock().unlock();
+        }
+    }
+}
+```
+
+### 5. ReentrantReadWriteLock
+**Жизненный пример**: Библиотечный каталог:
+- Читатели могут одновременно искать книги (read lock)
+- Библиотекарь реорганизует каталог (write lock)
+- Библиотекарь может читать каталог во время реорганизации (reentrant read)
+
+Код:
+```java
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+public class LibraryCatalog {
+    private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
+    private int bookCount = 100;
+
+    public int searchBook(String reader) {
+        rwLock.readLock().lock();
+        try {
+            System.out.println(reader + " ищет книгу. Всего книг: " + bookCount);
+            return bookCount;
+        } finally {
+            rwLock.readLock().unlock();
+        }
+    }
+
+    public void reorganizeCatalog(String librarian) {
+        rwLock.writeLock().lock();
+        try {
+            System.out.println(librarian + " начинает реорганизацию каталога...");
+            // Библиотекарь может читать во время реорганизации
+            checkCurrentCount(librarian);
+            Thread.sleep(3000); // Длительная реорганизация
+            bookCount = 120; // Добавили новые книги
+            System.out.println("Реорганизация завершена. Теперь книг: " + bookCount);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            rwLock.writeLock().unlock();
+        }
+    }
+
+    private void checkCurrentCount(String librarian) {
+        rwLock.readLock().lock(); // Повторный вход на чтение
+        try {
+            System.out.println(librarian + " проверяет текущее количество: " + bookCount);
+        } finally {
+            rwLock.readLock().unlock();
+        }
+    }
+}
+```
+
+|Ситуация|Рекомендуемая блокировка|Почему|
+|--------|------------------------|------|
+|Простые критические секции|synchronized|Простота использования, хорошая производительность|
+|Нужна попытка захвата без ожидания|Lock.tryLock()|Позволяет избежать deadlock или выполнить альтернативное действие|
+|Разные условия ожидания|Condition|Гибкое управление потоками ожидания|
+|Частое чтение, редкая запись|ReadWriteLock|Позволяет множественное чтение|
+|Нужна честность (FIFO)|ReentrantLock(true) или ReentrantReadWriteLock(true)|Гарантирует порядок получения блокировки|
+|Вложенные вызовы с блокировками|ReentrantLock или ReentrantReadWriteLock|Поддержка повторного входа|
+|Сложная логика освобождения|Lock|Явное управление unlock в finally|
+
+**Fair Locking** — механизм, где потоки получают блокировку строго в порядке очереди (FIFO — First In, First Out).
+
+**Принцип работы**:
+- Обычные блокировки (synchronized, ReentrantLock без fair) могут допускать "голодание" (starvation) — некоторые потоки ждут очень долго, пока более активные потоки постоянно перехватывают блокировку.
+- Fair Lock = true гарантирует, что самый долго ждущий поток получит блокировку следующим.
+
+**Пример из жизни**: очередь в кассу
+- Нечестная блокировка (non-fair): Новые покупатели могут "подрезать" очередь, если кассир освободился в момент их подхода.
+- Честная блокировка (fair): Кассир обслуживает строго по очереди, даже если кто-то пришел позже, но активно пытается пройти.
+
+Код:
+```java
+ReentrantLock fairLock = new ReentrantLock(true); // true = fair mode
+
+public void fairMethod() {
+  fairLock.lock();
+  try {
+    System.out.println(Thread.currentThread().getName() + " получил блокировку");
+  } finally {
+    fairLock.unlock();
+  }
+}
+```
+
+**Когда использовать?**
+- когда важно избежать голодания потоков.
+- когда порядок выполнения критически важен (транзакции в банке).
+
+**Минусы**:
+- Немного медленнее, чем non-fair (из-за управления очередью).
+- В высоконагруженных системах может снижать пропускную способность.
+
+**Read-Heavy Workload** — нагрузка, где операции чтения данных значительно преобладают над операциями записи.
+
+**Примеры из жизни**:
+- Википедия — миллионы чтений, редкие правки.
+- Кэш приложения — данные часто читаются, но обновляются редко.
+- Настройки системы — конфигурация загружается часто, но меняется редко.
+
+Почему ReadWriteLock лучше для read-heavy?
+- synchronized и ReentrantLock блокируют всех, даже читателей.
+- ReadWriteLock позволяет:
+  - Множеству потоков одновременно читать (readLock).
+  - Только одному потоку писать (writeLock).
+
+Код:
+```java
+ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
+
+// Много потоков могут читать одновременно
+public String readData() {
+  rwLock.readLock().lock();
+  try {
+    return data;
+  } finally {
+    rwLock.readLock().unlock();
+  }
+}
+
+// Только один поток может писать
+public void writeData(String newData) {
+  rwLock.writeLock().lock();
+  try {
+    data = newData;
+  } finally {
+    rwLock.writeLock().unlock();
+  }
+}
+```
+
+**Когда использовать?**
+- Кэширование (Redis, Memcached).
+- Конфигурационные файлы.
+- Системы с частыми запросами данных (аналитика, ленты новостей).
+
+**Минусы**:
+- Если записей много (write-heavy), ReadWriteLock может проигрывать обычным блокировкам из-за накладных расходов.
+
+#### Deadlock & Livelock
+Deadlock (взаимоблокировка) — ситуация, когда несколько потоков блокируют друг друга, ожидая освобождения ресурсов, которые они сами удерживают.
+Livelock — похож на deadlock, но потоки не блокируются, а бесконечно выполняют бесполезные действия, пытаясь разрешить конфликт.
+
+##### Deadlock из-за порядка наложения блокировок
+- возникает при захвате потоками блокировки в разном порядке, что может привести к циклическому ожиданию.
+
+Код:
+```java
+public class OrderDeadlock {
+private final Object lock1 = new Object();
+private final Object lock2 = new Object();
+
+    public void method1() {
+        synchronized (lock1) {
+            System.out.println("Захвачен lock1, ждем lock2...");
+            synchronized (lock2) {
+                System.out.println("Захвачены оба lock");
+            }
+        }
+    }
+
+    public void method2() {
+        synchronized (lock2) {
+            System.out.println("Захвачен lock2, ждем lock1...");
+            synchronized (lock1) {
+                System.out.println("Захвачены оба lock");
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        OrderDeadlock obj = new OrderDeadlock();
+        new Thread(obj::method1).start();
+        new Thread(obj::method2).start();
+    }
+}
+```
+
+Описание кода:
+- Поток 1 захватывает lock1 и ждет lock2.
+- Поток 2 захватывает lock2 и ждет lock1.
+- Оба потока зависают навсегда.
+
+**Пример из жизни**:
+Два человека в узком коридоре пытаются разойтись: один хочет пройти влево, другой — вправо, но оба постоянно двигаются в одну сторону и не могут разминуться.
+
+##### Deadlock из-за динамического порядка блокировок
+- блокировки захватываются в порядке, который зависит от входных данных (например, при работе с хеш-таблицей).
+
+Код:
+```java
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class DynamicOrderDeadlock {
+  
+  private static void transferMoney(Object from, Object to, int amount) {
+    synchronized (from) {
+      synchronized (to) {
+      System.out.println("Перевод " + amount + " с " + from + " на " + to);
+      }
+    }
+  }
+
+  public static void main(String[] args) {
+      Object account1 = new Object();
+      Object account2 = new Object();
+
+      new Thread(() -> transferMoney(account1, account2, 100)).start();
+      new Thread(() -> transferMoney(account2, account1, 200)).start();
+  }
+}
+```
+
+Описание:
+- Поток 1 блокирует account1 и ждет account2.
+- Поток 2 блокирует account2 и ждет account1.
+- Deadlock!
+
+Решение: Использовать глобальный порядок блокировок (например, по hashCode).
+
+##### Deadlock между взаимодействующими объектами
+- возникает, когда два объекта вызывают друг друга, удерживая свои мониторы.
+
+Код:
+```java
+class A {
+    synchronized void foo(B b) {
+        System.out.println("A.foo()");
+        b.bar();
+    }
+
+    synchronized void bar() {
+        System.out.println("A.bar()");
+    }
+}
+
+class B {
+    synchronized void bar() {
+        System.out.println("B.bar()");
+    }
+
+    synchronized void foo(A a) {
+        System.out.println("B.foo()");
+        a.bar();
+    }
+}
+
+public class InteractionDeadlock {
+    public static void main(String[] args) {
+      A a = new A();
+      B b = new B();
+
+      new Thread(() -> a.foo(b)).start();
+      new Thread(() -> b.foo(a)).start();
+    }
+}
+```
+
+Описание:
+- Поток 1 захватывает монитор A и вызывает b.bar(), но B уже заблокирован Потоком 2.
+- Поток 2 захватывает монитор B и вызывает a.bar(), но A уже заблокирован Потоком 1
+
+##### Deadlock ресурсов
+- потоки блокируют разные ресурсы (файлы, сокеты, БД), но в неправильном порядке.
+
+Пример из жизни:
+Два поезда едут по одноколейному пути навстречу друг другу — ни один не может проехать, пока другой не освободит путь.
+
+#### Livelock
+- потоки не блокируются, но бесконечно выполняют действия, не продвигаясь дальше.
+
+Код:
+```java
+public class LivelockExample {
+    static class Worker {
+    
+        private boolean busy = false;
+
+        void work(Worker other) {
+            while (busy) {
+                System.out.println("Жду, пока другой Worker освободится...");
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            busy = true;
+            System.out.println("Работаю...");
+            busy = false;
+        }
+    }
+
+    public static void main(String[] args) {
+        Worker worker1 = new Worker();
+        Worker worker2 = new Worker();
+
+        new Thread(() -> worker1.work(worker2)).start();
+        new Thread(() -> worker2.work(worker1)).start();
+    }
+}
+```
+
+Описание: 
+- Оба потока постоянно проверяют, свободен ли другой, но никогда не начинают работу.
+
+Пример из жизни:
+Два вежливых человека в дверном проеме пытаются пропустить друг друга, но оба бесконечно уступают дорогу.
+
+#### Условный и безусловный deadlock
+1. Безусловный Deadlock (гарантированная взаимоблокировка)
+- происходит всегда при определённом порядке выполнения потоков. Его можно легко воспроизвести, и он не зависит от внешних факторов.
+
+Пример в коде:
+```java
+public class UnconditionalDeadlock {
+    private static final Object lock1 = new Object();
+    private static final Object lock2 = new Object();
+
+    public static void main(String[] args) {
+        Thread thread1 = new Thread(() -> {
+            synchronized (lock1) {
+                System.out.println("Поток 1 захватил lock1");
+                synchronized (lock2) {
+                    System.out.println("Поток 1 захватил lock2");
+                }
+            }
+        });
+
+        Thread thread2 = new Thread(() -> {
+            synchronized (lock2) {
+                System.out.println("Поток 2 захватил lock2");
+                synchronized (lock1) {
+                    System.out.println("Поток 2 захватил lock1");
+                }
+            }
+        });
+
+        thread1.start();
+        thread2.start();
+    }
+}
+```
+
+Описание:
+- Поток 1 захватывает lock1, затем пытается взять lock2.
+- Поток 2 захватывает lock2, затем пытается взять lock1.
+- Оба потока гарантированно заблокируют друг друга — это безусловный deadlock.
+
+**Пример из жизни**: Два человека в узком коридоре.
+- Первый шаг влево и ждёт, пока второй отойдёт.
+- Второй шаг вправо и ждёт, пока первый отойдёт.
+- Они никогда не разойдутся, потому что оба упрямо стоят на своём.
+
+#### Условный Deadlock (вероятностная взаимоблокировка)
+- может произойти, но не всегда. Он зависит от:
+  - порядка выполнения потоков,
+  - задержек (тайминга),
+  - внешних условий (например, нагрузки на систему).
+
+Код:
+```java
+public class ConditionalDeadlock {
+    private static final Object lock1 = new Object();
+    private static final Object lock2 = new Object();
+
+    public static void main(String[] args) {
+        Thread thread1 = new Thread(() -> {
+            synchronized (lock1) {
+                System.out.println("Поток 1 захватил lock1");
+                try {
+                    Thread.sleep(100); // Имитация работы
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                synchronized (lock2) {
+                    System.out.println("Поток 1 захватил lock2");
+                }
+            }
+        });
+
+        Thread thread2 = new Thread(() -> {
+            synchronized (lock2) {
+                System.out.println("Поток 2 захватил lock2");
+                try {
+                    Thread.sleep(100); // Имитация работы
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                synchronized (lock1) {
+                    System.out.println("Поток 2 захватил lock1");
+                }
+            }
+        });
+
+        thread1.start();
+        thread2.start();
+    }
+}
+```
+
+Описание:
+- Если оба потока успеют захватить свои первые блокировки (lock1 и lock2) до того, как попытаются взять вторые, произойдёт deadlock.
+- Но если один поток выполнится быстрее (например, из-за случайной задержки), deadlock может не случиться.
+
+Почему это "условный" deadlock?
+- На однопроцессорной системе или при малой нагрузке deadlock может не проявиться.
+- При высокой конкуренции потоков (например, на сервере под нагрузкой) вероятность deadlock возрастает.
+
+**Пример из жизни**: Два водителя на перекрёстке.
+- Если оба одновременно подъедут и решают пропустить друг друга, может возникнуть "стояние" (deadlock).
+- Но если один проедет первым, конфликта не будет.
+
+Как избежать?
+- Унифицированный порядок блокировок (всегда брать lock1, потом lock2).
+- Использование tryLock() с таймаутом.
+- Уменьшение времени удержания блокировок.
+
+### CAS операции
+CAS (Compare-And-Swap) — это атомарная операция, используемая в многопоточном программировании для безопасного изменения значения переменной без блокировок (lock-free алгоритмы).
+
+CAS — это механизм, который позволяет:
+- Сравнить текущее значение переменной с ожидаемым.
+- Заменить его на новое, если оно не изменилось с момента чтения.
+- Вернуть true, если замена прошла успешно, и false — если нет.
+
+Это неблокирующая операция, что делает её быстрее традиционных synchronized блоков.
+
+#### Принцип работы CAS:
+- Чтение текущего значения (expectedValue).
+- Вычисление нового значения (newValue).
+- Попытка атомарной замены:
+  - Если текущее значение == expectedValue, то оно заменяется на newValue.
+  - Иначе операция не выполняется.
+
+Псевдокод CAS:
+```java
+boolean compareAndSwap(int expectedValue, int newValue) {
+    if (currentValue == expectedValue) {
+        currentValue = newValue;
+        return true;
+    }
+    return false;
+}
+```
+
+#### Плюсы и минусы CAS
+Плюсы:
++ Высокая производительность (нет блокировок, меньше накладных расходов).
++ Отсутствие deadlock (нет взаимных блокировок).
++ Масштабируемость (лучше работает при высокой конкуренции).
+
+Минусы:
+- ABA-проблема: значение могло измениться и вернуться к исходному, но поток этого не заметит.
+  - Решение: AtomicStampedReference (хранит метку версии).
+- Цикличные попытки (spin loop): если CAS не срабатывает, поток может долго повторять операцию.
+- Сложность отладки (неблокирующие алгоритмы сложнее проектировать).
+
+В Java CAS встречается в:
+1. Классы java.util.concurrent.atomic
+   - AtomicInteger, AtomicLong, AtomicBoolean
+   - AtomicReference (для объектов)
+   - AtomicStampedReference (избегает ABA-проблемы)
+2. Неблокирующие структуры данных
+   - ConcurrentHashMap (CAS для работы с узлами)
+   - CopyOnWriteArrayList
+3. Реализация ReentrantLock и Semaphore
+
+
+### Синхронизированные версии HashMap
