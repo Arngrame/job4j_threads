@@ -39,9 +39,9 @@ public class ThreadPool {
     }
 
     public void shutdown() {
-        IntStream.range(0, threads.size())
-                .filter(i -> threads.get(i).isAlive())
-                .forEach(i -> threads.get(i).interrupt());
+        threads.stream()
+                .filter(Thread::isAlive)
+                .forEach(Thread::interrupt);
     }
 
     public static void main(String[] args) {

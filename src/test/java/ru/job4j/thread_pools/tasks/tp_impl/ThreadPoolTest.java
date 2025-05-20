@@ -2,11 +2,9 @@ package ru.job4j.thread_pools.tasks.tp_impl;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
