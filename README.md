@@ -1351,3 +1351,8 @@ synchronized(map) {
 
 Аналоги кода с комментариями описаны в статье: https://vertex-academy.com/tutorials/ru/pattern-singleton-realizacii/
 
+### Thread Pool
+
+Ссылки:
+1. http://www.skipy.ru/technics/synchronization.html
+2. http://tutorials.jenkov.com/java-concurrency/thread-pools.html

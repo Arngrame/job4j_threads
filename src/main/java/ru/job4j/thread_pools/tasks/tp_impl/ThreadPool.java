@@ -8,9 +8,9 @@ import java.util.stream.IntStream;
 
 public class ThreadPool {
 
-    private final int THREAD_POOL_SIZE = Runtime.getRuntime().availableProcessors();
+    private final int threadPoolSize = Runtime.getRuntime().availableProcessors();
     private final List<Thread> threads = new LinkedList<>();
-    private final SimpleBlockingQueue<Runnable> tasks = new SimpleBlockingQueue<>(THREAD_POOL_SIZE);
+    private final SimpleBlockingQueue<Runnable> tasks = new SimpleBlockingQueue<>(threadPoolSize);
 
     public ThreadPool() {
         Runnable task = () -> {
@@ -23,7 +23,7 @@ public class ThreadPool {
             }
         };
 
-        IntStream.range(0, THREAD_POOL_SIZE)
+        IntStream.range(0, threadPoolSize)
                 .mapToObj(i -> new Thread(task))
                 .forEach(threads::add);
 
