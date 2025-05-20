@@ -1321,3 +1321,33 @@ synchronized(map) {
 Минусы:
 - Сложнее в реализации (по сравнению с HashTable и synchronizedMap).
 - В некоторых сценариях (редкие записи, много чтений) может быть избыточным.
+
+### Threadsafe Singleton
+Реализация паттерна Singleton требует внимание к проблеме visibility (видимости).
+Существует 2 способа решения этой проблемы:
+- использование volatile;
+- публикация объекта с модификатором final.
+
+Многопоточные реализации этого паттерна делятся на две группы:
+1. Энергичная загрузка:
+   - реализация с применением enum (аналогична однопоточной реализации): [EnergySingletonEnum.java](src%2Fmain%2Fjava%2Fru%2Fjob4j%2Fthread_pools%2Ftasks%2Fthread_safe_singleton%2FEnergySingletonEnum.java)<br>
+   объект создаётся при загрузке класса и безопасно публикуется всем клиентам
+   - реализация с применением модификатора final: [EnergySingletonFinal.java](src%2Fmain%2Fjava%2Fru%2Fjob4j%2Fthread_pools%2Ftasks%2Fthread_safe_singleton%2FEnergySingletonFinal.java)
+2. Ленивая загрузка:
+   - реализация single checked locking: [LazySingleCheckLocking.java](src%2Fmain%2Fjava%2Fru%2Fjob4j%2Fthread_pools%2Ftasks%2Fthread_safe_singleton%2FLazySingleCheckLocking.java)
+     - Инициализация и проверка instance происходит внутри критической секции, что снижает производительность.
+     - НЕ РЕКОМЕНДУЕТСЯ к использованию;
+   - реализация double check locking: [LazyDoubleCheckLocking.java](src%2Fmain%2Fjava%2Fru%2Fjob4j%2Fthread_pools%2Ftasks%2Fthread_safe_singleton%2FLazyDoubleCheckLocking.java)
+     - поле instance имеет модификатор volatile, значит проблемы видимости после инициализации поля нет;
+     - первая проверка идёт до блока синхронизации, что улучшает скорость работы по сравнению с SCL (предыдущая реализация);
+     - критическая секция содержит инициализацию экземпляра и запись его в переменную;
+     - НЕ РЕКОМЕНДУЕТСЯ к использованию, т.к. уменьшается производительность при многопроцессорном окружении. 
+   - Holder - идентичная реализация однопоточной среде: [LazySingletonHolder.java](src%2Fmain%2Fjava%2Fru%2Fjob4j%2Fthread_pools%2Ftasks%2Fthread_safe_singleton%2FLazySingletonHolder.java)
+     - стабильная работа, не влияющая на производительность системы.
+
+Общие выводы:
+1. Если нужна энергичная загрузка (нет необходимости в ленивой), используются реализации первой группы. Например, инициализация кэша или базы данных.
+2. Если есть необходимость в ленивой загрузке (наличие затратных ресурсов), то использовать ТОЛЬКО паттерн Holder.
+
+Аналоги кода с комментариями описаны в статье: https://vertex-academy.com/tutorials/ru/pattern-singleton-realizacii/
+
