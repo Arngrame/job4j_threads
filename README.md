@@ -1356,3 +1356,159 @@ synchronized(map) {
 Ссылки:
 1. http://www.skipy.ru/technics/synchronization.html
 2. http://tutorials.jenkov.com/java-concurrency/thread-pools.html
+
+
+### ExecutorService
+представляет собой интерфейс пакета java.util.concurrent для управления thread pool: упрощение выполнения асинхронных задач,
+управление жизненным циклом потока и обработку результатов.
+
+Особенности:
+- запуск задач (Runnable, Callable) в отдельных потоках;
+- пул потоков - переиспользование потоков, а не создание новых на каждую задачу;
+- управляет завершением - ожидает завершения задач или принудительно останавливает;
+- получает результаты с помощью Future для Callable
+
+#### 1. Создание ExecutorService
+Способы создания:
+1. С помощью Executors:
+- Пул с фиксированным количеством потоков:
+```java
+ExecutorService fixedThreadPool = Executors.newFixedThreadPool(4);
+```
+- Пул с динамическом количеством потоков, т.е. при увеличении нагрузки количество потоков будет увеличено:
+```java
+ExecutorService cachedThreadPool = Executors.newCachedThreadPool();
+```
+- Однопоточный пул:
+```java
+ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
+```
+- Пул для выполнения отложенных/периодических задач:
+```java
+ScheduledExecutorService scheduledExecutor = Executors.newScheduledThreadPool(2);
+```
+
+2. Ручное создание с указанием параметров:
+- corePoolSize - минимальное количество потоков;
+- maxPoolSize - максимальное количество потоков;
+- keepAliveTime - время, через которое лишний поток будет закрыт;
+- timeUnit - единица времени, в которых будет ожидаться keepAliveTime;
+- workQueue - очередь задач
+
+Пример:
+```java
+ExecutorService customThreadPool = new ThreadPoolExecutor(
+    4,
+    10,
+    60,
+    TimeUnit.SECONDS,
+    new LinkedBlockingQueue<>()
+);
+```
+
+#### 2. Запуск задач
+- Runnable
+```java
+ExecutorService executor = Executors.newFixedThreadPool(2);
+executor.execute(() -> {
+    System.out.println("Задача выполняется в потоке: " + Thread.currentThread().getName());
+});
+```
+
+- Callable
+```java
+Future<String> future = executor.submit(() -> {
+    Thread.sleep(1000);
+    return "hi";
+});
+
+int result = future.get();
+System.out.println("Результат: " + result);
+```
+
+#### 3. Завершение
+выполняется тремя способами:
+- shutdown() - завершение с ожиданием выполнения всех задач;
+- shutdownNow() - принудительное завершение, но без гарантий, что задачи будут не выполнены;
+- awaitTermination() - блокирует поток, пока пул не завершится или не истечет время таймаута.
+
+Утрированный пример:
+```java
+executor.shutdown();
+
+try {
+    if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+        executor.shutdownNow();
+    }
+} catch (InterruptedException e) {
+    executor.shutdownNow();
+}
+```
+
+#### 4. Обработка результатов
+- Future
+```java
+Future<String> future = executor.submit(() -> {
+    Thread.sleep(1000);
+    return "Результат";
+});
+
+if (future.isDone()) {
+    String result = future.get(); // Блокирует поток
+}
+```
+
+- CompletableFuture
+```java
+CompletableFuture.supplyAsync(() -> "Результат", executor)
+    .thenAccept(result -> System.out.println("Получено: " + result))
+    .exceptionally(ex -> { 
+        System.err.println("Ошибка: " + ex.getMessage());
+        return null; 
+    });
+```
+
+#### 5. Сценарии использования
+- параллельная обработка списка задач:
+```java
+List<Callable<String>> tasks = List.of(
+    () -> "Task 1",
+    () -> "Task 2",
+    () -> "Task 3"
+);
+
+// Блокируем, пока все задачи не завершатся
+List<Future<String>> futures = executor.invokeAll(tasks); 
+```
+
+- ограничение времени выполнения:
+```java
+try {
+    Future<String> future = executor.submit(() -> {
+        Thread.sleep(2000);
+        return "Done";
+    });
+    // TimeoutException будет выброшен, если задача не успеет выполниться за время
+    String result = future.get(1, TimeUnit.SECONDS);
+} catch (TimeoutException e) {
+    // Прерываем задачу
+    future.cancel(true); 
+}
+```
+
+- выполнение периодических задач:
+```java
+ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+scheduler.schedule(() -> System.out.println("Запущено через 3 секунды"), 3, TimeUnit.SECONDS);
+// или
+scheduler.scheduleAtFixedRate(() -> System.out.println("Каждые 2 секунды"), 1, 2, TimeUnit.SECONDS);
+```
+
+#### Особенности
+- утечка потоков: нужно завершать ExecutorService, иначе JVM не завершится;
+- отказоустойчивость: необходимо обрабатывать InterruptedException / ExecutionException;
+- настройки пулов и критерии использования:
+  - newFixedThreadPool - стабильная нагрузка;
+  - newCachedThreadPool - кратковременные асинхронные задачи;
+  - newWorkStealingPool - использование ForkJoinPool для паралеллизма.
