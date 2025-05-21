@@ -1540,3 +1540,40 @@ scheduler.scheduleAtFixedRate(() -> System.out.println("Каждые 2 секу�
 - под какие задачи использовать?
   - рекурсивные алгоритмы (поиск, сортировка, обход дерева);
   - параллельная обработка массивов и коллекций
+
+
+### CompletableFuture
+
+Методы:
+1. Создание и запуск
+- **runAsync(Runnable task)**
+- **runAsync(Runnable task, Executor executor)**
+- **supplyAsync(Supplier<U> supplier)**
+- **supplyAsync(Supplier<U> supplier, Executor executor)**
+- completedFuture(V value)
+2. Неблокирующие для преобразования результатов
+- **thenApply(Function<S, D> f)**
+- **thenAccept(Consumer<T> action)**
+- **thenRun(Runnable action)**
+- thenCompose(Function<T, CompletedStage<U> f)
+3. Комбинирование объектов Future
+- thenCombine(CompletionStage<T> otherFuture, BiFunction<F, S, R> fn)
+- thenAcceptBoth(CompletionStage<T> otherFuture, BiConsumer<F, S> fn)
+- runAfterBoth(CompletionStage<T> otherFuture, Runnable action)
+- applyToEither(CompletionStage<T> other, Function<T,U> fn)
+- acceptEither(CompletionStage<T> other, Consumer<T> action)
+4. Обработка исключений
+- exceptionally(Function<Throwable,T> fn)
+- handle(BiFunction<T,Throwable,U> fn)
+- whenComplete(BiConsumer<T,Throwable> action)
+5. Блокирующие
+- get()
+- get(long time, TimeUnit unit)
+- join()
+6. Дополнительные
+- allOf(CompletableFuture<T> ...)
+- anyOf(CompletableFuture<T> ...)
+- complete(T value)
+- completeExceptionally(Throwable ex)
+
+TODO
