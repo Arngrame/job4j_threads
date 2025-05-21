@@ -1512,3 +1512,5 @@ scheduler.scheduleAtFixedRate(() -> System.out.println("Каждые 2 секу�
   - newFixedThreadPool - стабильная нагрузка;
   - newCachedThreadPool - кратковременные асинхронные задачи;
   - newWorkStealingPool - использование ForkJoinPool для паралеллизма.
+
+### ForkJoinPool
