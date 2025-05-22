@@ -1543,37 +1543,93 @@ scheduler.scheduleAtFixedRate(() -> System.out.println("Каждые 2 секу�
 
 
 ### CompletableFuture
-
 Методы:
-1. Создание и запуск
-- **runAsync(Runnable task)**
-- **runAsync(Runnable task, Executor executor)**
-- **supplyAsync(Supplier<U> supplier)**
-- **supplyAsync(Supplier<U> supplier, Executor executor)**
-- completedFuture(V value)
-2. Неблокирующие для преобразования результатов
-- **thenApply(Function<S, D> f)**
-- **thenAccept(Consumer<T> action)**
-- **thenRun(Runnable action)**
-- thenCompose(Function<T, CompletedStage<U> f)
-3. Комбинирование объектов Future
-- thenCombine(CompletionStage<T> otherFuture, BiFunction<F, S, R> fn)
-- thenAcceptBoth(CompletionStage<T> otherFuture, BiConsumer<F, S> fn)
-- runAfterBoth(CompletionStage<T> otherFuture, Runnable action)
-- applyToEither(CompletionStage<T> other, Function<T,U> fn)
-- acceptEither(CompletionStage<T> other, Consumer<T> action)
-4. Обработка исключений
-- exceptionally(Function<Throwable,T> fn)
-- handle(BiFunction<T,Throwable,U> fn)
-- whenComplete(BiConsumer<T,Throwable> action)
-5. Блокирующие
-- get()
-- get(long time, TimeUnit unit)
-- join()
-6. Дополнительные
-- allOf(CompletableFuture<T> ...)
-- anyOf(CompletableFuture<T> ...)
-- complete(T value)
-- completeExceptionally(Throwable ex)
 
-TODO
+1. Создание и запуск:
+```
+   - runAsync(Runnable task);
+   - runAsync(Runnable task, Executor executor);
+   - supplyAsync(Supplier<T> supplier);
+   - supplyAsync(Supplier<U> supplier, Executor executor);
+   - completedFuture(V value).
+```
+2. Неблокирующие для преобразования результатов
+```
+   - thenApply(Function<S, D> f)
+   - thenAccept(Consumer<T> action)
+   - thenRun(Runnable action)
+   - thenCompose(Function<T, CompletedStage<U> f)
+```
+3. Комбинирование объектов Future
+```
+   - thenCombine(CompletionStage<T> otherFuture, BiFunction<F, S, R> fn)
+   - thenAcceptBoth(CompletionStage<T> otherFuture, BiConsumer<F, S> fn)
+   - runAfterBoth(CompletionStage<T> otherFuture, Runnable action)
+   - applyToEither(CompletionStage<T> other, Function<T,U> fn)
+   - acceptEither(CompletionStage<T> other, Consumer<T> action)
+```
+4. Обработка исключений
+```
+   - exceptionally(Function<Throwable,T> fn)
+   - handle(BiFunction<T,Throwable,U> fn)
+   - whenComplete(BiConsumer<T,Throwable> action)
+```
+5. Блокирующие
+```
+   - get()
+   - get(long time, TimeUnit unit)
+   - join()
+```
+6. Дополнительные
+```
+   - allOf(CompletableFuture<T> ...)
+   - anyOf(CompletableFuture<T> ...)
+   - complete(T value)
+   - completeExceptionally(Throwable ex)
+```
+
+### Runnable, Callable, Future, FutureTask
+
+Runnable:
+- интерфейс для представления задачи для выполнения потоком
+- содержит единственный метод run
+- не возвращает результат (void)
+
+Callable<T>:
+- интерфейс для представления задачи для выполнения потоком
+- типизированный интерфейс, T - тип возвращаемого значения
+- не требует try-with-resources, может выбрасывать исключения
+- позволяет выявлять состояние нити
+- Future/Callable можно управлять **задачами** вне методов run() или call().
+
+Future<V>:
+- Объект интерфейса Future возвращается объектом типа Callable, V - тип возвращаемого значения
+- работает с задачами, результат выполнения которых будет получен в будущем (Future - это еще не вычисленный результат)
+- значение Future будет заполнено только после выполнения задачи
+- методы:
+```java
+- get() - бесконечно ожидает результата выполнения задачи (пока задача выполняется).
+- get(long Timeout, TimeUnit unit) - ожидает результат в течение указанного количества времени. Пока методы get() ждут результата, программа выполняется синхронно.
+- cancel() - пытается отменить задачу. Не гарантирует, что задача точно отменится. Она может выполниться до конца.
+- isCancelled() - возвращает true, если задача была успешно снята с выполнения.
+- isDone() - возвращает true, если задача завершена (получено значение), либо перед этим был вызван метод cancel().
+```
+
+FutureTask`<T>`
+- реализация интерфейса Future, которая выполнена в виде отменяемого асинхронного вычисления
+- работает и с Runnable, и с Callable
+- наследует свойства интерфейсов RunnableFuture -> Future & Runnable
+
+Сравнительная таблица:<br>
+
+|Характеристика|Runnable|Callable|Future|FutureTask|CompletableFuture|
+|--------------|--------|--------|------|----------|-----------------|
+|Возвращает результат|Нет|Да|Да|Да|Да|
+|Выбрасывает исключения|Нет|Да|Да|Да|Да|
+|Поддержка цепочек|Нет|Нет|Нет|Нет|Да|
+|Комбинирование задач|Нет|Нет|Нет|Нет|Да|
+|Обработка исключений|Нет|Нет|Нет|Нет|Да|
+|Ручное завершение|Нет|Нет|Да|Да|Да|
+
+
+
