@@ -17,50 +17,50 @@ class ParallelIndexSearchTest {
 
     @Test
     public void whenParallelSearchString() {
-        ParallelIndexSearch<String> index = new ParallelIndexSearch<>(colors, "GREY-12", 0, colors.length);
-        Integer actualResult = index.searchIndex(colors, "GREY-12");
-
+        Integer actualResult = ParallelIndexSearch.searchIndex(colors, "GREY-12");
         assertEquals(12, actualResult);
     }
 
     @Test
     public void whenLinearSearchString() {
-        ParallelIndexSearch<String> index = new ParallelIndexSearch<>(measures, "foot", 1, measures.length);
-        Integer actualResult = index.searchIndex(measures, "foot");
-
+        Integer actualResult = ParallelIndexSearch.searchIndex(measures, "foot");
         assertEquals(1, actualResult);
     }
 
     @Test
     public void whenParallelSearchInteger() {
-        ParallelIndexSearch<Integer> index = new ParallelIndexSearch<>(otherIndexes, 110, 0, otherIndexes.length);
-        Integer actualResult = index.searchIndex(otherIndexes, 110);
-
+        Integer actualResult = ParallelIndexSearch.searchIndex(otherIndexes, 110);
         assertEquals(10, actualResult);
     }
 
     @Test
     public void whenLinearSearchInteger() {
-        ParallelIndexSearch<Integer> index = new ParallelIndexSearch<>(indexes, 1, 1, indexes.length);
-        Integer actualResult = index.searchIndex(indexes, 1);
-
+        Integer actualResult = ParallelIndexSearch.searchIndex(indexes, 1);
         assertEquals(0, actualResult);
     }
 
     @Test
     public void whenParallelSearchButValueDoesNotExist() {
-        ParallelIndexSearch<Integer> index = new ParallelIndexSearch<>(otherIndexes, 54, 0, otherIndexes.length);
-        Integer actualResult = index.searchIndex(otherIndexes, 1);
-
+        Integer actualResult = ParallelIndexSearch.searchIndex(otherIndexes, 1);
         assertEquals(-1, actualResult);
     }
 
     @Test
     public void whenLinearSearchButValueDoesNotExist() {
-        ParallelIndexSearch<Integer> index = new ParallelIndexSearch<>(indexes, -30, 0, indexes.length);
-        Integer actualResult = index.searchIndex(indexes, -30);
-
+        Integer actualResult = ParallelIndexSearch.searchIndex(indexes, -30);
         assertEquals(-1, actualResult);
+    }
+
+    @Test
+    public void whenParallelSearchLast() {
+        Integer actualResult = ParallelIndexSearch.searchIndex(otherIndexes, 120);
+        assertEquals(11, actualResult);
+    }
+
+    @Test
+    public void whenLinearSearchLast() {
+        Integer actualResult = ParallelIndexSearch.searchIndex(indexes, 9);
+        assertEquals(8, actualResult);
     }
 
 }
